@@ -1,0 +1,16 @@
+node_modules
+.git
+.env
+data
+dist
+engine.mjs
+.sites-runtime
+bootstrap-access.txt
+*.sqlite*
+
+.env*
+owner.json
+initial-board.json
+retailflow-initial-board.json
+source-backups
+*.tar.gz

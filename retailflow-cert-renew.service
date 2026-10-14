@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew Easy Retailflow HTTPS certificate
+After=docker.service network-online.target
+Requires=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker run --rm -v /etc/letsencrypt:/etc/letsencrypt -v /var/www/retailflow-acme:/var/www/acme certbot/certbot@sha256:f70ad0adbb7e117f0fe42a63c553f28ea451edabc0148757b6efcd9735acaa20 renew --cert-name erftrack.totalclient.xyz --webroot -w /var/www/acme --quiet
+ExecStartPost=/usr/sbin/nginx -t
+ExecStartPost=/bin/systemctl reload nginx

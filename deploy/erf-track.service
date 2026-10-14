@@ -1,0 +1,20 @@
+[Unit]
+Description=ERF Track calendar
+After=network.target
+
+[Service]
+Type=simple
+User=erftrack
+Group=erftrack
+WorkingDirectory=/opt/erf-track
+EnvironmentFile=/opt/erf-track/.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/erf-track/server.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

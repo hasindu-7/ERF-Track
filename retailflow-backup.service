@@ -1,0 +1,8 @@
+[Unit]
+Description=Easy Retailflow database backup
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/erf-track
+ExecStart=/usr/bin/docker compose exec -T app node backup.mjs

@@ -147,3 +147,22 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# ERF Track runtime data, secrets and generated output
+.env*
+!.env.example
+engine.mjs
+data/
+.sites-runtime/
+*.tsbuildinfo
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+bootstrap-access.txt
+*-access.txt
+owner.json
+initial-board.json
+retailflow-initial-board.json
+source-backups/
+*.tar.gz
