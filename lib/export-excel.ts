@@ -12,11 +12,12 @@ export function localDateTime(value:string|null|undefined):Date|null {
  const n=(type:string)=>Number(p.find(x=>x.type===type)!.value);
  return new Date(Date.UTC(n('year'),n('month')-1,n('day'),n('hour'),n('minute'),n('second')));
 }
-const eventNames:Record<string,string>={added:'Task added',started:'Started',paused:'Paused',resumed:'Resumed',completed:'Completed',reopened:'Reopened',details_updated:'Details updated',deadline_extended:'Deadline extended',deadline_set:'Deadline set',meeting_added:'Meeting added',meeting_updated:'Meeting updated'};
+const eventNames:Record<string,string>={added:'Task added',started:'Started',paused:'Paused',resumed:'Resumed',completed:'Completed',reopened:'Reopened',details_updated:'Details updated',deadline_extended:'Deadline extended',deadline_set:'Deadline set',meeting_added:'Meeting added',meeting_updated:'Meeting updated',status_changed:'Status changed',sent_to_live:'Sent to Live',promoted_from_dev:'Created from Dev'};
 
 export function buildExportWorkbook(board:Board,today:string,generatedAt=new Date().toISOString()){
  const workbook=new ExcelJS.Workbook();
  workbook.creator='Easy Retailflow';workbook.created=new Date(generatedAt);workbook.modified=new Date(generatedAt);
+ const projectName=(id:string)=>board.projects.find(p=>p.id===id)?.name||id;
  const person=(id:string)=>board.members.find(m=>m.id===id)?.name||'Team member';
  const taskName=(id:string|null)=>id?board.tasks.find(t=>t.id===id)?.name||id:'';
  const stamp=localDateTime(generatedAt)!;
@@ -45,27 +46,28 @@ export function buildExportWorkbook(board:Board,today:string,generatedAt=new Dat
  const taskRows=board.tasks.map(t=>[
   t.parentId?'Subtask':'Task',t.name,taskName(t.parentId),t.origin==='client'?'Client':'Internal',t.client,person(t.ownerId),statusName[t.status],
   localDateTime(t.addedAt),dateValue(t.plannedFrom),localDateTime(t.startedAt),dateValue(t.deadline),localDateTime(t.completedAt),
-  isOverdue(t,today)?'Yes':'No',isOverdue(t,today)?dayDiff(t.deadline!,today):0,t.notes,t.id,t.parentId||''
+  isOverdue(t,today)?'Yes':'No',isOverdue(t,today)?dayDiff(t.deadline!,today):0,t.notes,t.id,t.parentId||'',projectName(t.projectId),t.environment==='live'?'Live':'Dev',t.category==='issue'?'Issue':'Feature',t.paused?'Yes':'No',t.sourceTaskId||'',t.liveTaskId||''
  ] as Value[]);
  const tasks=sheet('Tasks',[
   {label:'Type',width:12},{label:'Task name',width:36},{label:'Parent task',width:36},{label:'Origin',width:12},{label:'Client',width:24},{label:'Responsible',width:24},{label:'Status',width:18},
   {label:'Added on',width:23,format:DATETIME},{label:'Planned start',width:18,format:DATE},{label:'Actually started',width:23,format:DATETIME},{label:'Deadline',width:18,format:DATE},{label:'Completed on',width:23,format:DATETIME},
-  {label:'Overdue',width:12},{label:'Days overdue',width:15,format:'0'},{label:'Notes',width:65},{label:'Task ID',width:39},{label:'Parent ID',width:39}
+  {label:'Overdue',width:12},{label:'Days overdue',width:15,format:'0'},{label:'Notes',width:65},{label:'Task ID',width:39},{label:'Parent ID',width:39},{label:'Project',width:30},{label:'Environment',width:14},{label:'Category',width:14},{label:'Paused',width:12},{label:'Dev source ID',width:39},{label:'Live entry ID',width:39}
  ],taskRows);
- board.tasks.forEach((t,i)=>{if(t.status==='not_started'||isOverdue(t,today))tasks.getCell(i+5,7).font={name:'Calibri',size:11,color:{argb:'FFB04438'}};});
+ board.tasks.forEach((t,i)=>{if(t.status==='pending'||isOverdue(t,today))tasks.getCell(i+5,7).font={name:'Calibri',size:11,color:{argb:'FFB04438'}};});
  sheet('Meetings',[
-  {label:'Meeting',width:36},{label:'Date',width:18,format:DATE},{label:'Time',width:14,format:'hh:mm'},{label:'Duration (minutes)',width:20,format:'0'},{label:'Status',width:16},{label:'Minutes / special notes',width:70},{label:'Added on',width:23,format:DATETIME},{label:'Meeting ID',width:39}
- ],[...board.meetings].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).map(m=>[m.title,dateValue(m.date),Number(m.time.slice(0,2))/24+Number(m.time.slice(3,5))/1440,m.duration,m.status.charAt(0).toUpperCase()+m.status.slice(1),m.notes,localDateTime(m.createdAt),m.id]));
+  {label:'Meeting',width:36},{label:'Date',width:18,format:DATE},{label:'Time',width:14,format:'hh:mm'},{label:'Duration (minutes)',width:20,format:'0'},{label:'Status',width:16},{label:'Minutes / special notes',width:70},{label:'Added on',width:23,format:DATETIME},{label:'Meeting ID',width:39},{label:'Project',width:30},{label:'Environment',width:14}
+ ],[...board.meetings].sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).map(m=>[m.title,dateValue(m.date),Number(m.time.slice(0,2))/24+Number(m.time.slice(3,5))/1440,m.duration,m.status.charAt(0).toUpperCase()+m.status.slice(1),m.notes,localDateTime(m.createdAt),m.id,projectName(m.projectId),m.environment==='live'?'Live':'Dev']));
  sheet('Team',[{label:'Name',width:30},{label:'Email',width:42},{label:'Login enabled',width:20},{label:'Member ID',width:39}],board.members.map(m=>[m.name,m.email,m.userId?'Yes':'No',m.id]));
  const events:{kind:string;name:string;id:string;a:Audit}[]=[];
  board.tasks.forEach(t=>t.history.forEach(a=>events.push({kind:t.parentId?'Subtask':'Task',name:t.name,id:t.id,a})));
  board.meetings.forEach(m=>m.history.forEach(a=>events.push({kind:'Meeting',name:m.title,id:m.id,a})));
  sheet('Activity',[
-  {label:'Record type',width:14},{label:'Task / meeting',width:36},{label:'Event',width:24},{label:'Recorded at',width:23,format:DATETIME},{label:'Changed by',width:24},{label:'Reason',width:65},{label:'Previous deadline',width:21,format:DATE},{label:'New deadline',width:18,format:DATE},{label:'Record ID',width:39}
- ],events.sort((a,b)=>a.a.at.localeCompare(b.a.at)).map(({kind,name,id,a})=>[kind,name,eventNames[a.type]||a.type,localDateTime(a.at),a.actorName,a.reason,dateValue(a.from),dateValue(a.to),id]));
+  {label:'Record type',width:14},{label:'Task / meeting',width:36},{label:'Event',width:24},{label:'Recorded at',width:23,format:DATETIME},{label:'Changed by',width:24},{label:'Reason',width:65},{label:'Previous value',width:21,format:DATE},{label:'New value',width:18,format:DATE},{label:'Record ID',width:39},{label:'Project',width:30},{label:'Environment',width:14}
+ ],events.sort((a,b)=>a.a.at.localeCompare(b.a.at)).map(({kind,name,id,a})=>[kind,name,eventNames[a.type]||a.type,localDateTime(a.at),a.actorName,a.reason,['status_changed','reopened'].includes(a.type)?(statusName[a.from as keyof typeof statusName]||a.from||''):dateValue(a.from),['status_changed','reopened'].includes(a.type)?(statusName[a.to as keyof typeof statusName]||a.to||''):dateValue(a.to),id,projectName((board.tasks.find(t=>t.id===id)||board.meetings.find(m=>m.id===id))!.projectId),(board.tasks.find(t=>t.id===id)||board.meetings.find(m=>m.id===id))!.environment==='live'?'Live':'Dev']));
  sheet('Pauses',[
-  {label:'Task',width:36},{label:'Parent task',width:36},{label:'Paused from',width:23,format:DATETIME},{label:'Resumed on',width:23,format:DATETIME},{label:'Pause state',width:18},{label:'Reason',width:65},{label:'Paused by',width:24},{label:'Waiting for',width:36},{label:'Expected resume',width:20,format:DATE},{label:'Task ID',width:39}
- ],board.tasks.flatMap(t=>t.pauses.map(p=>[t.name,taskName(t.parentId),localDateTime(p.from),localDateTime(p.to),p.to?'Ended':'Still paused',p.reason,p.actorName,taskName(p.waitingFor),dateValue(p.expectedResume),t.id])));
+  {label:'Task',width:36},{label:'Parent task',width:36},{label:'Paused from',width:23,format:DATETIME},{label:'Resumed on',width:23,format:DATETIME},{label:'Pause state',width:18},{label:'Reason',width:65},{label:'Paused by',width:24},{label:'Waiting for',width:36},{label:'Expected resume',width:20,format:DATE},{label:'Task ID',width:39},{label:'Project',width:30},{label:'Environment',width:14}
+ ],board.tasks.flatMap(t=>t.pauses.map(p=>[t.name,taskName(t.parentId),localDateTime(p.from),localDateTime(p.to),p.to?'Ended':'Still paused',p.reason,p.actorName,taskName(p.waitingFor),dateValue(p.expectedResume),t.id,projectName(t.projectId),t.environment==='live'?'Live':'Dev'])));
+ sheet('Projects',[{label:'Project',width:36},{label:'Project ID',width:39},{label:'Created on',width:23,format:DATETIME}],board.projects.map(p=>[p.name,p.id,localDateTime(p.createdAt)]));
  return workbook;
 }
 

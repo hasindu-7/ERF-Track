@@ -1,13 +1,13 @@
 {
-  "name": "retailflow-vps",
-  "version": "1.0.0",
+  "name": "erf-track-php",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && node build-server.mjs",
-    "start": "node --env-file=.env server.mjs",
-    "test": "node --test tests/domain.test.mjs tests/server.test.mjs tests/excel-export.test.mjs",
-    "check": "tsc --noEmit"
+    "build": "node scripts/prepare-assets.mjs && vite build",
+    "check": "tsc --noEmit",
+    "test": "node scripts/test.mjs",
+    "start": "php -S 127.0.0.1:8080 -t public php/router.php"
   },
   "dependencies": {
     "exceljs": "4.4.0",

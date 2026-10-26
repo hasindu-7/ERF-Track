@@ -166,3 +166,9 @@ initial-board.json
 retailflow-initial-board.json
 source-backups/
 *.tar.gz
+
+# Private PHP installation configuration
+config.local.php
+setup-key.php
+*.install.lock
+*.tmp-*
