@@ -12,7 +12,7 @@ export function localDateTime(value:string|null|undefined):Date|null {
  const n=(type:string)=>Number(p.find(x=>x.type===type)!.value);
  return new Date(Date.UTC(n('year'),n('month')-1,n('day'),n('hour'),n('minute'),n('second')));
 }
-const eventNames:Record<string,string>={added:'Task added',started:'Started',paused:'Paused',resumed:'Resumed',completed:'Completed',reopened:'Reopened',details_updated:'Details updated',deadline_extended:'Deadline extended',deadline_set:'Deadline set',meeting_added:'Meeting added',meeting_updated:'Meeting updated',status_changed:'Status changed',sent_to_live:'Sent to Live',promoted_from_dev:'Created from Dev'};
+const eventNames:Record<string,string>={sheet_sync_changed:'Google Sheets selection changed',added:'Task added',started:'Started',paused:'Paused',resumed:'Resumed',completed:'Completed',reopened:'Reopened',details_updated:'Details updated',deadline_extended:'Deadline extended',deadline_set:'Deadline set',meeting_added:'Meeting added',meeting_updated:'Meeting updated',status_changed:'Status changed',sent_to_live:'Sent to Live',promoted_from_dev:'Created from Dev'};
 
 export function buildExportWorkbook(board:Board,today:string,generatedAt=new Date().toISOString()){
  const workbook=new ExcelJS.Workbook();

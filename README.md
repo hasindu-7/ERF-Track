@@ -106,3 +106,9 @@ python tools/package-cpanel.py --output /private/path/ERF-Track-PHP-cPanel.zip -
 Both output paths must be outside the public web root. The package contains the activation key's hash; the raw key stays in the separate text file. Use the key matching the package.
 
 `nginx.conf` remains an optional PHP-FPM example for server administrators; it is not needed for ordinary cPanel installation. Production no longer uses `server.mjs` or a persistent Node service.
+
+## Selected-task Google Sheets reporting
+
+Open task details and select **Sync to Google Sheets** for each entry to include. Dev, Live and subtasks are independent. An administrator creates/revokes the read-only connection key in **Export → Google Sheets sync**. The supplied bound Google Apps Script refreshes a dedicated tab about every five minutes. See [GOOGLE-SHEETS.md](GOOGLE-SHEETS.md) for the existing-install update and Google authorization steps.
+
+To package an existing-install update after building: `python tools/package-update.py --output /private/path/ERF-Track-Google-Sheets-Update.zip`. This package excludes configuration, databases, installation keys, installers and `.htaccess`.

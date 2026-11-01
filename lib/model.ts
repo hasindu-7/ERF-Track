@@ -6,10 +6,10 @@ export type Environment='dev'|'live';
 export type Member = { id: string; name: string; email: string; userId: string | null };
 export type Audit = { id: string; type: string; at: string; actorId: string; actorName: string; reason: string; from?: string | null; to?: string | null };
 export type Pause = { id: string; from: string; to: string | null; reason: string; actorName: string; actorId: string; waitingFor: string | null; expectedResume: string | null; parentPauseId?: string };
-export type Task = { projectId:string;environment:Environment;category:'issue'|'feature';paused:boolean;sourceTaskId:string|null;liveTaskId:string|null;id: string; parentId: string | null; name: string; origin: 'internal' | 'client'; client: string; ownerId: string; color: string; notes: string; addedAt: string; plannedFrom: string | null; startedAt: string | null; completedAt: string | null; deadline: string | null; status: Status; pauses: Pause[]; history: Audit[] };
+export type Task = { sheetSync:boolean; projectId:string;environment:Environment;category:'issue'|'feature';paused:boolean;sourceTaskId:string|null;liveTaskId:string|null;id: string; parentId: string | null; name: string; origin: 'internal' | 'client'; client: string; ownerId: string; color: string; notes: string; addedAt: string; plannedFrom: string | null; startedAt: string | null; completedAt: string | null; deadline: string | null; status: Status; pauses: Pause[]; history: Audit[] };
 export type Meeting = { projectId:string;environment:Environment;id: string; title: string; date: string; time: string; duration: number | null; notes: string; status: 'scheduled' | 'held' | 'cancelled'; createdAt: string; history: Audit[] };
 export type Board = { schemaVersion:2;projects:Project[];tasks: Task[]; meetings: Meeting[]; members: Member[]; timezone: string };
-export type Snapshot = { board: Board; revision: number; user: { userId: string; displayName: string; email: string }; today: string };
+export type Snapshot = { board: Board; revision: number; user: { userId: string; displayName: string; email: string; role?:string }; today: string };
 export function dateInZone(at: string | Date = new Date()): string {
   const parts = new Intl.DateTimeFormat('en-CA', {timeZone: TIMEZONE,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(at));
   return ['year','month','day'].map(t => parts.find(p => p.type===t)!.value).join('-');

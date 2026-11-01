@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__.'/domain.php';
 
 require_once __DIR__.'/storage.php';
+require_once __DIR__.'/sheets.php';
 function rf_response(mixed $data,int $status=200):never {http_response_code($status);header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store');echo json_encode($data,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE);exit;}
 function rf_input():array {$raw=file_get_contents('php://input',false,null,0,50001);rf_require($raw!==false&&strlen($raw)<=50000,'Request too large.');try{$v=json_decode($raw,true,32,JSON_THROW_ON_ERROR);}catch(JsonException){throw new InputError('Invalid JSON.');}rf_require(is_array($v)&&str_starts_with(ltrim($raw),'{'),'Invalid request.');return $v;}
 function rf_cookie(string $token,bool $remember=false,bool $clear=false):void {setcookie('rf_session',$token,['expires'=>$clear?1:($remember?time()+30*86400:0),'path'=>'/','secure'=>rf_config()['secure'],'httponly'=>true,'samesite'=>'Lax']);}
@@ -27,6 +28,7 @@ function rf_api(string $path):never {
         if(($_SERVER['HTTP_ORIGIN']??'')!==rf_config()['origin'])rf_response(['error'=>'Invalid request origin.'],403);
     }
     $db=rf_db();$db->prepare('DELETE FROM erf_sessions WHERE expires_at<?')->execute([time()]);$db->prepare('DELETE FROM erf_login_attempts WHERE until_at<?')->execute([time()]);
+    if($path==='/api/google-sheets/feed'&&$method==='GET')rf_sheets_feed($db);
     if($path==='/api/login'&&$method==='POST'){
         $p=rf_input();$email=strtolower(rf_optional($p['email']??null,'Email',200));$password=$p['password']??'';$ip=$_SERVER['REMOTE_ADDR']??'unknown';$keys=[hash('sha256',$ip.'|'.$email),hash('sha256',$ip.'|*')];foreach($keys as $key)if(rf_throttle($db,$key))rf_response(['error'=>'Too many attempts. Try again in 15 minutes.'],429);
         rf_require(is_string($password)&&strlen($password)<=256,'Invalid email or password.');$q=$db->prepare('SELECT * FROM erf_users WHERE email=?');$q->execute([$email]);$user=$q->fetch();$dummy='$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';$valid=password_verify($password,$user['password_hash']??$dummy);
@@ -41,6 +43,7 @@ function rf_api(string $path):never {
         if(!is_string($old)||!password_verify($old,$user['password_hash'])){rf_throttle($db,$key,true);throw new InputError('Current password is incorrect.');}rf_require($old!==$new,'Choose a different password.');rf_begin($db);try{$db->prepare('UPDATE erf_users SET password_hash=?,must_change=0 WHERE id=?')->execute([password_hash($new,PASSWORD_DEFAULT),$user['id']]);$db->prepare('DELETE FROM erf_sessions WHERE user_id=? AND token_hash<>?')->execute([$user['id'],$user['token_hash']]);rf_commit($db);}catch(Throwable $e){rf_rollback($db);throw $e;}rf_response(['ok'=>true]);
     }
     if($user['must_change'])rf_response(['error'=>'Change your temporary password before continuing.'],403);
+    if($path==='/api/google-sheets/settings'){if($user['role']!=='admin')rf_response(['error'=>'Only administrators can manage the Sheets connection.'],403);rf_sheets_settings($db,$method);}
     if($path==='/api/accounts'&&$method==='POST'){
         if($user['role']!=='admin')rf_response(['error'=>'Only administrators can create logins.'],403);$p=rf_input();$state=rf_snapshot($db,$user);$member=null;foreach($state['board']['members'] as $m)if($m['id']===($p['memberId']??null))$member=$m;rf_require($member!==null&&$member['email']!=='','Add a member with an email first.');$password=bin2hex(random_bytes(12));$newId=rf_id();
         try{$db->prepare('INSERT INTO erf_users(id,name,email,password_hash,role,must_change,created_at) VALUES(?,?,?,?,?,1,?)')->execute([$newId,$member['name'],strtolower($member['email']),password_hash($password,PASSWORD_DEFAULT),'member',rf_now()]);}catch(PDOException $e){if($e->getCode()==='23000')rf_response(['error'=>'This person already has a login.'],409);throw $e;}rf_snapshot($db,['id'=>$newId,'name'=>$member['name'],'email'=>strtolower($member['email']),'role'=>'member']);rf_response(['email'=>$member['email'],'password'=>$password],201);
