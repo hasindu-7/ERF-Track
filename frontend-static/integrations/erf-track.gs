@@ -1,4 +1,7 @@
-/** Bound Google Apps Script. No web-app deployment or public sheet needed. */
+/**
+ * @OnlyCurrentDoc
+ * Bound Google Apps Script. No web-app deployment or public sheet needed.
+ */
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('ERF Track')
     .addItem('Set up / replace key', 'setupERFTrack')
@@ -54,7 +57,9 @@ function syncERFTrack(){
   try{
     const props=PropertiesService.getScriptProperties(),p=props.getProperties();
     if(!p.ERF_KEY||!p.ERF_BOOK_ID)throw new Error('Run setupERFTrack first.');
-    const data=erfFetch_(p.ERF_ORIGIN,p.ERF_KEY),book=SpreadsheetApp.openById(p.ERF_BOOK_ID),sheet=erfFindSheet_(book,p.ERF_SHEET_ID);
+    const data=erfFetch_(p.ERF_ORIGIN,p.ERF_KEY),book=SpreadsheetApp.getActiveSpreadsheet();
+    if(!book||book.getId()!==p.ERF_BOOK_ID)throw new Error('Run this script from its original bound spreadsheet.');
+    const sheet=erfFindSheet_(book,p.ERF_SHEET_ID);
     if(!sheet)throw new Error('The managed ERF Track tab was deleted. Run setupERFTrack again.');
     const columns=data.columns.length,newRows=data.rows.length+1,height=Math.max(newRows,sheet.getLastRow(),1);
     if(sheet.getMaxRows()<height)sheet.insertRowsAfter(sheet.getMaxRows(),height-sheet.getMaxRows());
