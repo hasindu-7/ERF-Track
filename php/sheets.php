@@ -12,14 +12,26 @@ function rf_sheets_connection(PDO $db):array|false {
     return $db->query("SELECT token_hash,created_at,last_fetched_at FROM erf_integrations WHERE id='google_sheets'")->fetch();
 }
 function rf_sheets_payload(array $board,int $revision):array {
-    $board=rf_normalize($board);$projects=array_column($board['projects'],'name','id');$members=array_column($board['members'],'name','id');
-    $selected=array_filter($board['tasks'],fn($t)=>$t['sheetSync']===true);$ids=array_column($selected,'id');
-    $states=['pending'=>'Pending','working'=>'Working on','up_for_testing'=>'Up for testing','testing'=>'Testing','done'=>'Done'];$rows=[];
+    $board=rf_normalize($board);$projects=array_column($board['projects'],'name','id');
+    $selected=array_filter($board['tasks'],fn($t)=>$t['sheetSync']===true);
+    $states=['pending'=>'Pending','working'=>'In progress','up_for_testing'=>'Ready for testing','testing'=>'Testing','done'=>'Done'];$rows=[];$today=rf_day();
+    $names=array_count_values(array_column($selected,'name'));
     foreach($selected as $t){
-        // Never expose an unselected parent's name, notes, or identifier.
-        $rows[]=[$t['id'],in_array($t['parentId'],$ids,true)?$t['parentId']:'',$projects[$t['projectId']]??'',ucfirst($t['environment']),ucfirst($t['category']),$t['name'],ucfirst($t['origin']),$t['client'],$members[$t['ownerId']]??'',$states[$t['status']]??$t['status'],$t['paused']?'Yes':'No',rf_day($t['addedAt']),$t['startedAt']?rf_day($t['startedAt']):'',$t['deadline']??'',$t['completedAt']?rf_day($t['completedAt']):'',$t['notes']];
+        $extensions=array_values(array_filter($t['history'],fn($h)=>$h['type']==='deadline_extended'&&!empty($h['from'])));
+        $original=$extensions?$extensions[0]['from']:($t['deadline']??'');
+        $revised=$extensions?($t['deadline']??''):'';
+        $reason='';
+        if($t['paused'])foreach(array_reverse($t['pauses']) as $pause)if(!$pause['to']){$reason=$pause['reason'];break;}
+        if($reason==='')foreach(array_reverse($t['history']) as $h)if(in_array($h['type'],['deadline_extended','deadline_set','reopened','status_changed'],true)&&trim($h['reason']??'')!==''){$reason=$h['reason'];break;}
+        // Keep the management report concise; the full audit stays in the calendar.
+        $reason=preg_replace('/\s+/u',' ',trim($reason))??'';if(preg_match('/^(.{177}).{4}/us',$reason,$short))$reason=$short[1].'...';
+        $name=$t['name'];if(($names[$name]??0)>1)$name=($projects[$t['projectId']]??'Project').' / '.ucfirst($t['environment']).' - '.$name;
+        $status=$t['paused']?'Paused':($states[$t['status']]??$t['status']);
+        if($t['status']!=='done'&&!empty($t['deadline'])&&$t['deadline']<$today)$status='Overdue - '.$status;
+        $rows[]=[rf_day($t['addedAt']),$name,$original,$revised,$status,$reason];
     }
-    return ['format'=>'erf-selected-tasks-v1','revision'=>$revision,'generatedAt'=>rf_now(),'timezone'=>RF_ZONE,'columns'=>['Task ID','Parent task ID','Project','Environment','Category','Task','Origin','Client','Owner','Status','Paused','Added','Started','Deadline','Completed','Notes'],'rows'=>array_values($rows)];
+    usort($rows,fn($a,$b)=>[$a[4]==='Done'?1:0,$a[3]?:$a[2]?:'9999-12-31',$a[1]]<=>[$b[4]==='Done'?1:0,$b[3]?:$b[2]?:'9999-12-31',$b[1]]);
+    return ['format'=>'erf-management-tasks-v2','revision'=>$revision,'generatedAt'=>rf_now(),'timezone'=>RF_ZONE,'columns'=>['Date','Task','Deadline','Deadline extended','Status','Reason / blocker'],'rows'=>array_values($rows)];
 }
 function rf_sheets_feed(PDO $db):never {
     $connection=rf_sheets_connection($db);$key=$_SERVER['HTTP_X_ERF_SHEETS_KEY']??'';

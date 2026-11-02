@@ -42,8 +42,8 @@ function erfFetch_(url,key){
   });
   if(response.getResponseCode()!==200)throw new Error('ERF Track feed returned HTTP '+response.getResponseCode()+'. Check the app URL, connection key and hosting access rules. Existing rows have been kept.');
   let data;try{data=JSON.parse(response.getContentText());}catch(e){throw new Error('ERF Track returned an invalid feed. Existing rows have been kept.');}
-  const expected=['Task ID','Parent task ID','Project','Environment','Category','Task','Origin','Client','Owner','Status','Paused','Added','Started','Deadline','Completed','Notes'];
-  if(!data||data.format!=='erf-selected-tasks-v1'||JSON.stringify(data.columns)!==JSON.stringify(expected)||!Array.isArray(data.rows)||data.rows.length>5000||data.rows.some(row=>!Array.isArray(row)||row.length!==expected.length||row.some(cell=>typeof cell!=='string'))){
+  const expected=['Date','Task','Deadline','Deadline extended','Status','Reason / blocker'];
+  if(!data||data.format!=='erf-management-tasks-v2'||JSON.stringify(data.columns)!==JSON.stringify(expected)||!Array.isArray(data.rows)||data.rows.length>5000||data.rows.some(row=>!Array.isArray(row)||row.length!==expected.length||row.some(cell=>typeof cell!=='string'))){
     throw new Error('Unsupported ERF Track feed. Existing rows have been kept.');
   }
   return data;
@@ -61,16 +61,22 @@ function syncERFTrack(){
     if(!book||book.getId()!==p.ERF_BOOK_ID)throw new Error('Run this script from its original bound spreadsheet.');
     const sheet=erfFindSheet_(book,p.ERF_SHEET_ID);
     if(!sheet)throw new Error('The managed ERF Track tab was deleted. Run setupERFTrack again.');
-    const columns=data.columns.length,newRows=data.rows.length+1,height=Math.max(newRows,sheet.getLastRow(),1);
+    const columns=data.columns.length,newRows=data.rows.length+1,height=Math.max(newRows,sheet.getLastRow(),2),width=Math.max(columns,sheet.getLastColumn());
     if(sheet.getMaxRows()<height)sheet.insertRowsAfter(sheet.getMaxRows(),height-sheet.getMaxRows());
     if(sheet.getMaxColumns()<columns)sheet.insertColumnsAfter(sheet.getMaxColumns(),columns-sheet.getMaxColumns());
     // One replacement write also blanks stale rows after unchecking. Never clear first.
-    const values=[data.columns,...data.rows].map(row=>row.map(erfCell_));
-    while(values.length<height)values.push(Array(columns).fill(''));
-    sheet.getRange(1,1,height,columns).setNumberFormat('@').setValues(values);
+    const values=[data.columns,...data.rows].map((row,index)=>row.map((value,col)=>index>0&&[0,2,3].includes(col)&&/^\d{4}-\d{2}-\d{2}$/.test(value)?new Date(value+'T00:00:00Z'):erfCell_(value)));
+    values.forEach(row=>{while(row.length<width)row.push('');});
+    while(values.length<height)values.push(Array(width).fill(''));
+    sheet.getRange(1,1,height,width).setNumberFormat('@').setValues(values);
+    if(width>columns)sheet.getRange(1,columns+1,height,width-columns).clearFormat();
+    for(const col of [1,3,4])sheet.getRange(2,col,height-1,1).setNumberFormat('dd mmm yyyy');
+    sheet.getRange(2,1,height-1,columns).setVerticalAlignment('top').setWrap(true);
     sheet.getRange(1,1,1,columns).setBackground('#255d48').setFontColor('#ffffff').setFontWeight('bold');
-    sheet.setFrozenRows(1);sheet.setColumnWidths(1,columns,140);sheet.setColumnWidth(6,280);sheet.setColumnWidth(16,380);
-    sheet.getRange(1,1).setNote('Last completed refresh: '+new Date().toISOString()+'\n'+data.rows.length+' selected entries. One-way report. Edit tasks in ERF Track. Dates: '+data.timezone+'.');
+    sheet.setFrozenRows(1);sheet.setColumnWidths(1,columns,130);sheet.setColumnWidth(2,360);sheet.setColumnWidth(4,150);sheet.setColumnWidth(5,175);sheet.setColumnWidth(6,380);
+    const statusRange=sheet.getRange(2,5,height-1,1);
+    sheet.setConditionalFormatRules([['Overdue','#fce8e6','#a50e0e'],['Paused','#fef7e0','#8d6200'],['Done','#e6f4ea','#137333'],['Testing','#e8f0fe','#174ea6']].map(([text,bg,fg])=>SpreadsheetApp.newConditionalFormatRule().whenTextContains(text).setBackground(bg).setFontColor(fg).setRanges([statusRange]).build()));
+    sheet.getRange(1,1).setNote('Last completed refresh: '+new Date().toISOString()+'\n'+data.rows.length+' selected entries. Date = added date. Deadline = original. Deadline extended = latest revision. Reasons show the current blocker or latest change, not full history. Edit tasks in ERF Track. Dates: '+data.timezone+'.');
     if(sheet.getFilter())sheet.getFilter().remove();sheet.getRange(1,1,Math.max(newRows,2),columns).createFilter();
     SpreadsheetApp.flush();props.setProperty('ERF_LAST_SUCCESS',new Date().toISOString());
   }finally{lock.releaseLock();}

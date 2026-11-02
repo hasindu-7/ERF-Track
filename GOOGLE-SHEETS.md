@@ -25,7 +25,7 @@ Open the new Google Sheet using the Google account that will own the automatic r
 1. Open **Extensions → Apps Script**.
 2. Replace the starter `Code.gs` content with the provided **ERF-Track-Google-Sheets.gs** script. It can also be downloaded from the app's sync panel.
 3. Save. Choose **setupERFTrack** in the function picker and click Run.
-4. Google asks for authorization to edit this spreadsheet, fetch the protected feed and schedule refreshes. Review and authorize the script under your own account. If Workspace policy blocks it, ask your Google administrator to approve it.
+4. Google asks for authorization limited to this bound spreadsheet, fetching the protected feed and scheduling refreshes. Review and authorize the script under your own account. If Workspace policy blocks it, ask your Google administrator to approve it.
 5. Return to the sheet for the prompts. Enter `https://erftrack.aradhana.au` (or the exact origin of your installation), then the private connection key. The key belongs in the prompt, **never in a cell**.
 6. The script creates its managed **ERF Track** tab, fetches selected tasks, and schedules refreshes about every five minutes. No Apps Script web-app deployment, public sheet, API project, cPanel cron or terminal is needed.
 
@@ -37,14 +37,14 @@ If a tab named ERF Track already exists but has never been managed by this scrip
 - Parents and subtasks have independent checkboxes. Selecting a parent does not select children; a selected child does not expose its unselected parent's details.
 - Dev and Live entries are independent. Newly promoted Live copies start **unchecked**, even if their Dev source is checked.
 - Updates to selected tasks are reflected on the next successful refresh. Unchecking removes the row on that refresh. Finished tasks stay included until unchecked.
-- All selected entries appear in one tab, with Project, Environment, Issue/Feature, client/internal origin, owner, workflow status, paused state, dates and notes. The sheet does not include team emails, passwords, meetings, audit histories or unselected tasks.
+- All selected entries appear in one management report with exactly six columns: Date, Task, Deadline, Deadline extended, Status, Reason / blocker. Date is the added date; Deadline keeps the original commitment and Deadline extended shows the latest revised date. Status highlights overdue or paused work. Reasons show the active pause blocker, otherwise the latest deadline/reopening explanation. Full history, owners, client fields, general notes, IDs, emails and technical fields are excluded. Duplicate task names are qualified by project/environment so management can tell them apart. Unfinished entries appear before Done, ordered by current deadline.
 - Hover the Task ID header cell for the last completed refresh time. Use **ERF Track → Refresh now** in the sheet to refresh manually after reopening it.
 
 Sheet edits do not update ERF Track. Treat the sheet as a report and edit task data in the app.
 
 ## Privacy and maintenance
 
-Anyone who can view the sheet can view the selected client names and task notes. Restrict sharing accordingly. Trusted spreadsheet editors can inspect the bound Apps Script and its Script Properties, including the read-only key. Do not grant edit rights to people who should not have that key. Creating this report does not make your ERF Track site or the sheet public.
+Anyone who can view the sheet can view the selected task names, dates, status and concise reasons. Restrict sharing accordingly. Trusted spreadsheet editors can inspect the bound Apps Script and its Script Properties, including the read-only key. Do not grant edit rights to people who should not have that key. Creating this report does not make your ERF Track site or the sheet public.
 
 The server stores a SHA-256 hash of the connection key. It accepts the raw key only through the `X-ERF-Sheets-Key` HTTP header on `/api/google-sheets/feed`, never a URL parameter. This credential cannot read the main calendar API, change tasks, or manage users. It is independent of your sign-in session, so it does not expire with your 30-day login.
 
